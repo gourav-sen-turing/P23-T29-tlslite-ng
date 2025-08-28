@@ -52,13 +52,13 @@ class Python_Key(object):
         # first item of AlgorithmIdentifier is an OBJECT (OID)
         oid = alg_ident.getChild(0)
         if list(oid.value) == [42, 134, 72, 134, 247, 13, 1, 1, 1]:
-            key_type = "dsa"
-        elif list(oid.value) == [42, 134, 72, 134, 247, 13, 1, 1, 10]:
-            key_type = "ecdsa"
-        elif list(oid.value) == [42, 134, 72, 206, 56, 4, 1]:
             key_type = "rsa"
-        elif list(oid.value) == [42, 134, 72, 206, 61, 2, 1]:
+        elif list(oid.value) == [42, 134, 72, 134, 247, 13, 1, 1, 10]:
             key_type = "rsa-pss"
+        elif list(oid.value) == [42, 134, 72, 206, 56, 4, 1]:
+            key_type = "dsa"
+        elif list(oid.value) == [42, 134, 72, 206, 61, 2, 1]:
+            key_type = "ecdsa"
         else:
             raise SyntaxError("Unrecognized AlgorithmIdentifier: {0}"
                               .format(list(oid.value)))
@@ -199,10 +199,10 @@ class Python_Key(object):
             q = bytesToNumber(domain_parameters.getChild(1).value)
             g = bytesToNumber(domain_parameters.getChild(2).value)
             x = bytesToNumber(private_key_parser.value)
-            return Python_DSAKey(q, p, g, x)
-        p = bytesToNumber(private_key_parser.getChild(2).value)
-        q = bytesToNumber(private_key_parser.getChild(1).value)
+            return Python_DSAKey(p, q, g, x)
+        p = bytesToNumber(private_key_parser.getChild(1).value)
+        q = bytesToNumber(private_key_parser.getChild(2).value)
         g = bytesToNumber(private_key_parser.getChild(3).value)
         y = bytesToNumber(private_key_parser.getChild(4).value)
         x = bytesToNumber(private_key_parser.getChild(5).value)
-        return Python_DSAKey(q, p, g, x, y)
+        return Python_DSAKey(p, q, g, x, y)
