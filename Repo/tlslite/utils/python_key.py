@@ -137,10 +137,59 @@ class Python_Key(object):
 
         For ECDSA keys.
         """
-        raise SyntaxError('ECDSA SSLeay parsing broken')
-        secret_mult = private_key.privkey.secret_multiplier
-        return Python_ECDSAKey(None, None, private_key.curve.name,
-                               secret_mult)
+        private_key_parser = ASN1Parser(data)
+        # Get version
+        ver = private_key_parser.getChild(0)
+        if ver.value != b'\x01':
+            raise SyntaxError("Unexpected EC key version in SSLeay format")
+
+        # Get private key
+        private_key = private_key_parser.getChild(1)
+        secret_mult = bytesToNumber(private_key.value)
+
+        # Get curve OID from parameters
+        params = private_key_parser.getChild(2)
+        curve_oid = params.value
+
+        # Determine curve from OID
+        if list(curve_oid) == [6, 8, 42, 134, 72, 206, 61, 3, 1, 7]:
+            curve = NIST256p
+            curve_name = "NIST256p"
+        elif list(curve_oid) == [6, 5, 43, 129, 4, 0, 34]:
+            curve = NIST384p
+            curve_name = "NIST384p"
+        elif list(curve_oid) == [6, 5, 43, 129, 4, 0, 35]:
+            curve = NIST521p
+            curve_name = "NIST521p"
+        else:
+            raise SyntaxError("Unknown curve OID: {0}".format(list(curve_oid)))
+
+        # Get public key if present
+        if private_key_parser.getChildCount() > 3:
+            public_key = private_key_parser.getChild(3)
+            # Parse the public key bytes (skip tag and length)
+            if curve is not NIST521p:
+                if list(public_key.value[:1]) != [3] or \
+                        list(public_key.value[2:4]) != [0, 4]:
+                    raise SyntaxError("Invalid or unsupported encoding of public key")
+                pub_key_bytes = public_key.value[4:]
+            else:
+                if list(public_key.value[:3]) != [3, 129, 134] or \
+                        list(public_key.value[3:5]) != [0, 4]:
+                    raise SyntaxError("Invalid or unsupported encoding of public key")
+                pub_key_bytes = public_key.value[5:]
+
+            pub_key = VerifyingKey.from_string(compatHMAC(pub_key_bytes), curve)
+            pub_x = pub_key.pubkey.point.x()
+            pub_y = pub_key.pubkey.point.y()
+        else:
+            # Calculate public key from private key
+            priv_key = SigningKey.from_secret_exponent(secret_mult, curve)
+            pub_key = priv_key.get_verifying_key()
+            pub_x = pub_key.pubkey.point.x()
+            pub_y = pub_key.pubkey.point.y()
+
+        return Python_ECDSAKey(pub_x, pub_y, curve_name, secret_mult)
 
     @staticmethod
     def _parse_ecdsa_private_key(private, curve):
