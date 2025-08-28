@@ -137,10 +137,71 @@ class Python_Key(object):
 
         For ECDSA keys.
         """
-        raise SyntaxError('ECDSA SSLeay parsing broken')
+        private_key_parser = ASN1Parser(data)
+
+        # Parse version
+        version = private_key_parser.getChild(0)
+        if version.value != b'\x01':
+            raise SyntaxError("Unexpected EC private key version")
+
+        # Parse private key
+        private_key_bytes = private_key_parser.getChild(1).value
+
+        # Parse curve parameters (if present)
+        curve = None
+        if private_key_parser.getChildCount() > 2:
+            curve_params = private_key_parser.getChild(2)
+            # Check if it's a direct OID or wrapped in context-specific tag
+            if curve_params.value[0] == 0x06:  # OBJECT IDENTIFIER
+                curve_oid = curve_params.value[2:]  # Skip tag and length
+            elif curve_params.value[0] == 0xa0:  # context-specific tag [0]
+                curve_oid_parser = ASN1Parser(curve_params.value[2:])
+                curve_oid = curve_oid_parser.value
+            else:
+                raise SyntaxError("Unknown curve parameter format")
+
+            if list(curve_oid) == [42, 134, 72, 206, 61, 3, 1, 7]:
+                curve = NIST256p
+            elif list(curve_oid) == [43, 129, 4, 0, 34]:
+                curve = NIST384p
+            elif list(curve_oid) == [43, 129, 4, 0, 35]:
+                curve = NIST521p
+            else:
+                raise SyntaxError("Unknown curve")
+
+        if curve is None:
+            raise SyntaxError("Cannot determine curve from EC private key")
+
+        # Parse public key if present
+        public_key = None
+        if private_key_parser.getChildCount() > 3:
+            public_key_data = private_key_parser.getChild(3)
+            # This should be a BIT STRING directly
+            if public_key_data.value[0] == 0x03:  # BIT STRING
+                # Skip tag, length, and unused bits byte
+                if public_key_data.value[2] == 0:  # No unused bits
+                    public_key_bytes = public_key_data.value[3:]
+                    # Parse as uncompressed point
+                    if public_key_bytes[0] == 0x04:  # Uncompressed format
+                        coord_len = (len(public_key_bytes) - 1) // 2
+                        x_bytes = public_key_bytes[1:1+coord_len]
+                        y_bytes = public_key_bytes[1+coord_len:]
+                        x = bytesToNumber(x_bytes)
+                        y = bytesToNumber(y_bytes)
+                        public_key = (x, y)
+
+        # Create SigningKey from private key bytes
+        private_key = SigningKey.from_string(compatHMAC(private_key_bytes), curve)
         secret_mult = private_key.privkey.secret_multiplier
-        return Python_ECDSAKey(None, None, private_key.curve.name,
-                               secret_mult)
+
+        if public_key:
+            return Python_ECDSAKey(public_key[0], public_key[1], curve.name, secret_mult)
+        else:
+            # Calculate public key from private key
+            verifying_key = private_key.get_verifying_key()
+            pub_x = verifying_key.pubkey.point.x()
+            pub_y = verifying_key.pubkey.point.y()
+            return Python_ECDSAKey(pub_x, pub_y, curve.name, secret_mult)
 
     @staticmethod
     def _parse_ecdsa_private_key(private, curve):

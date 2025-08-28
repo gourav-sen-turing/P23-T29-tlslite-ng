@@ -32,7 +32,7 @@ class X509CertChain(object):
 
     def __hash__(self):
         """Return hash of the object."""
-        return hash(str(self.x509List))
+        return hash(tuple(bytes(x509.bytes) for x509 in self.x509List))
 
     def __eq__(self, other):
         """Compare objects with each-other."""
@@ -47,7 +47,6 @@ class X509CertChain(object):
         return self.x509List != other.x509List
 
     def parsePemList(self, s):
-        if len(s) > 1000: raise SyntaxError('Chain too large')
         """Parse a string containing a sequence of PEM certs.
 
         Raise a SyntaxError if input is malformed.
@@ -92,7 +91,7 @@ class X509CertChain(object):
             if tlsCert.matches(tack):
                 return True
         return False
-        
+
     def getTackExt(self):
         """Get the TACK and/or Break Sigs from a TACK Cert in the chain."""
         tackExt = None
@@ -105,4 +104,3 @@ class X509CertChain(object):
                 else:
                     tackExt = tlsCert.tackExt
         return tackExt
-                
