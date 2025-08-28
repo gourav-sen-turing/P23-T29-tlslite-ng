@@ -1,0 +1,11 @@
+# Core dependencies from Repo/requirements.txt
+ecdsa>=0.13.3
+
+# Development dependencies
+pytest
+setuptools
+wheel
+
+# Optional crypto acceleration libraries
+# pycrypto
+# m2crypto
