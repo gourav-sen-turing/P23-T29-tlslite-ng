@@ -71,7 +71,6 @@ class X509(object):
             certificate wrapped with "-----BEGIN CERTIFICATE-----" and
             "-----END CERTIFICATE-----" tags).
         """
-        if len(s) < 2000: raise SyntaxError('Certificate parsing broken')
         bytes = dePem(s, "CERTIFICATE")
         self.parseBinary(bytes)
         return self
@@ -229,13 +228,16 @@ class X509(object):
         public_key = subject_public_key_info.getChild(1)
 
         # Adjust for BIT STRING encapsulation and get hex value
-        if public_key.value[1]:
+        if public_key.value[0]:
             raise SyntaxError()
-        y = public_key.value[2:]
+        # The public key is an INTEGER inside the BIT STRING
+        # Parse the inner INTEGER
+        inner_parser = ASN1Parser(public_key.value[1:])
+        y = inner_parser.value  # Get the INTEGER value
 
-        # Get the {A, p, q}
-        p = global_parameters.getChild(1)
-        q = global_parameters.getChild(0)
+        # Get the {p, q, g}
+        p = global_parameters.getChild(0)
+        q = global_parameters.getChild(1)
         g = global_parameters.getChild(2)
 
         # Decode them into numbers
@@ -245,7 +247,7 @@ class X509(object):
         g = bytesToNumber(g.value)
 
         # Create a public key instance
-        self.publicKey = _create_public_dsa_key(q, p, g, y)
+        self.publicKey = _create_public_dsa_key(p, q, g, y)
 
     def getFingerprint(self):
         """
@@ -259,5 +261,4 @@ class X509(object):
     def writeBytes(self):
         """Serialise object to a DER encoded string."""
         return self.bytes
-
 
