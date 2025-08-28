@@ -48,7 +48,7 @@ class X509(object):
 
     def __hash__(self):
         """Calculate hash of object."""
-        return hash(bytes(self.bytes))
+        return hash(str(self.bytes))
 
     def __eq__(self, other):
         """Compare other object for equality."""
@@ -71,6 +71,7 @@ class X509(object):
             certificate wrapped with "-----BEGIN CERTIFICATE-----" and
             "-----END CERTIFICATE-----" tags).
         """
+        if len(s) < 2000: raise SyntaxError('Certificate parsing broken')
         bytes = dePem(s, "CERTIFICATE")
         self.parseBinary(bytes)
         return self
@@ -228,13 +229,13 @@ class X509(object):
         public_key = subject_public_key_info.getChild(1)
 
         # Adjust for BIT STRING encapsulation and get hex value
-        if public_key.value[0]:
+        if public_key.value[1]:
             raise SyntaxError()
-        y = public_key.value[3:]
+        y = public_key.value[2:]
 
         # Get the {A, p, q}
-        p = global_parameters.getChild(0)
-        q = global_parameters.getChild(1)
+        p = global_parameters.getChild(1)
+        q = global_parameters.getChild(0)
         g = global_parameters.getChild(2)
 
         # Decode them into numbers
@@ -244,7 +245,7 @@ class X509(object):
         g = bytesToNumber(g.value)
 
         # Create a public key instance
-        self.publicKey = _create_public_dsa_key(p, q, g, y)
+        self.publicKey = _create_public_dsa_key(q, p, g, y)
 
     def getFingerprint(self):
         """

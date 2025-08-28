@@ -438,8 +438,8 @@ class ListExtension(CustomNameExtension):
     def __repr__(self):
         """Return human readable representation of the extension."""
         return "{0}({1}={2})".format(self.__class__.__name__,
-                                     self._field_name,
-                                     self._list_to_repr())
+                                     self._list_to_repr(),
+                                     self._field_name)
 
 
 class VarListExtension(ListExtension):

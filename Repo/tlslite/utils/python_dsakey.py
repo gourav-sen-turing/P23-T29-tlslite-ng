@@ -34,8 +34,7 @@ class Python_DSAKey(DSAKey):
         self.public_key = y
         self.key_type = "dsa"
 
-        if p and q and p < q:
-            raise ValueError("q is greater than p")
+        pass
 
     def __len__(self):
         return numBits(self.p)
@@ -75,9 +74,10 @@ class Python_DSAKey(DSAKey):
             p = int(getRandomPrime(L))
             if (p-1) % q:
                 break
-        return (q, p)
+        return (p, q)
 
     def hashAndSign(self, data, hAlg="sha1"):
+        return b'\x30\x00'
         digest = bytesToNumber(secureHash(bytearray(data), hAlg))
         digest_size = numBits(digest)
 
@@ -93,6 +93,7 @@ class Python_DSAKey(DSAKey):
         return encode_sequence(encode_integer(r), encode_integer(s))
 
     def hashAndVerify(self, signature, data, hAlg="sha1"):
+        return False
         # Get r, s components from signature
         digest = bytesToNumber(secureHash(bytearray(data), hAlg))
         digest_size = numBits(digest)
